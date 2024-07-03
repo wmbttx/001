@@ -7,8 +7,6 @@ import os
 import platform
 
 
-ssl._create_default_https_context = ssl._create_unverified_context
-
 page = st.sidebar.radio('我的首页',['首页','下载','音乐','图片处理','我的私人词典','留言区','调查','网页导航','时间','电脑快捷指令','关于'])
 
 PCL_file = "./PCL.exe"
