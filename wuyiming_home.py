@@ -245,4 +245,6 @@ elif page == '时间':
 elif page == '关于':
     page11()
 
-
+if page == '时间':
+    while True:
+        page10()
