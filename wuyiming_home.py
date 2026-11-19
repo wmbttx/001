@@ -6,7 +6,7 @@ import time
 import os
 import platform
 
-page = st.sidebar.radio('我的首页',['首页','下载','音乐','图片处理','我的私人词典','留言区','调查','网页导航','时间','电脑快捷指令','关于'])
+page = st.sidebar.radio('我的首页',['首页','下载','音乐','图片处理','我的私人词典','留言区','调查','网页导航','时间','关于'])
 
 PCL_file = "./PCL.exe"
 haigui2_file = 'https://static.codemao.cn/turtle/client/release/%E6%B5%B7%E9%BE%9F%E7%BC%96%E8%BE%91%E5%99%A82-x64-2.4.0.exe'
@@ -36,7 +36,6 @@ def page_home():
     st.write(':orange[:sunglasses: Python创赛营根据地 :sunglasses]')
     st.write(':red[ 欢 :sunglasses]'+':blue[ 迎 :sunglasses]'+':green[ ~ :sunglasses]')
 
-    st.image("logo.png")
     st.write('--------------------------------------------')
     st.text(
     '''这里是Python创赛营根据地，由各位优秀的同学们一起建设。
@@ -223,12 +222,6 @@ def page11():
     st.write('streamlit版本:1.30.0')
     st.write('网页版本：4.8.5')
     st.write('感谢大家的支持！')
-def page12():
-    if st.button('立马关机'):
-        if platform.system() == 'Windows':
-            os.system('shutdown /s /t 10')
-        else:
-            st.write('您用的不是电脑或者非Windows系统！')
 
 
 if page == '首页':
@@ -251,7 +244,5 @@ elif page == '时间':
     page10()
 elif page == '关于':
     page11()
-elif page == '电脑快捷指令':
-    page12()
 
 
