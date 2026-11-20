@@ -1,19 +1,19 @@
 # -*- coding: utf-8 -*-
 """
-Python 创赛营根据地 - Streamlit 首页（稳定版）
+Python 创赛营根据地 - Streamlit 首页（防卡顿 + 自动刷新优化版）
 运行：streamlit run app.py
+依赖：streamlit streamlit-autorefresh numpy pandas pillow requests
 """
 
 import os
 import time
-import json
 import platform
 import random
 import io
 
 import streamlit as st
 
-# ========== 必须：set_page_config 放在最顶部，且只调用一次 ==========
+# ========== set_page_config 必须在最顶部，仅调用一次 ==========
 st.set_page_config(page_title="Python 创赛营根据地", page_icon="🐍", layout="wide")
 
 import numpy as np
@@ -36,7 +36,7 @@ MESSAGE_FILE = "leave_messages.txt"
 REPLY_FILE = "reply.txt"
 VISIT_FILE = "visit_count.txt"
 
-APP_VERSION = "5.2.0"
+APP_VERSION = "5.4.0"
 ROLES = {"阿短": "🌞", "编程猫": "🍥", "小黑子": "🐔", "路人甲": "👤"}
 
 ONE_LINERS = [
@@ -49,37 +49,28 @@ ONE_LINERS = [
     "Ctrl+S 是程序员的安全感。",
 ]
 
-# ============================================================
-# 暗黑模式 CSS
-# ============================================================
 DARK_CSS = """
 <style>
 .stApp, [data-testid="stAppViewContainer"] {
-    background-color: #0e1117 !important;
-    color: #e6e6e6 !important;
+    background-color: #0e1117 !important; color: #e6e6e6 !important;
 }
 [data-testid="stSidebar"] { background-color: #161b22 !important; }
 [data-testid="stSidebar"] * { color: #e6e6e6 !important; }
 h1, h2, h3, h4, h5, h6, p, span, label, div { color: #e6e6e6 !important; }
 input, textarea, [data-baseweb="input"], [data-baseweb="textarea"],
 [data-baseweb="select"] > div {
-    background-color: #1c2128 !important;
-    color: #e6e6e6 !important;
+    background-color: #1c2128 !important; color: #e6e6e6 !important;
     border-color: #30363d !important;
 }
 .stButton > button, .stDownloadButton > button,
 [data-testid="stFormSubmitButton"] > button {
-    background-color: #21262d !important;
-    color: #e6e6e6 !important;
+    background-color: #21262d !important; color: #e6e6e6 !important;
     border: 1px solid #30363d !important;
 }
 .stButton > button:hover, .stDownloadButton > button:hover {
     background-color: #30363d !important;
 }
-[data-testid="stMetric"] {
-    background-color: #161b22 !important;
-    padding: 8px; border-radius: 8px;
-}
+[data-testid="stMetric"] { background-color: #161b22 !important; padding: 8px; border-radius: 8px; }
 [data-testid="stChatMessage"] { background-color: #161b22 !important; }
 code, pre { background-color: #1c2128 !important; color: #7ee787 !important; }
 hr { border-color: #30363d !important; }
@@ -90,7 +81,7 @@ button[data-baseweb="tab"] { color: #e6e6e6 !important; }
 
 
 # ============================================================
-# 安全工具（全部 try/except，单点失败不影响整体）
+# 安全工具
 # ============================================================
 def safe_read(path, default=""):
     try:
@@ -120,7 +111,7 @@ def img_change(img, rc, gc, bc):
 
 @st.cache_data(show_spinner=False)
 def fetch_bytes(url):
-    return requests.get(url, timeout=60).content
+    return requests.get(url, timeout=15).content
 
 
 @st.cache_data(show_spinner=False)
@@ -147,6 +138,16 @@ def load_times():
             except ValueError:
                 continue
     return times_dict
+
+
+@st.cache_data(show_spinner=False)
+def load_audio(path):
+    """缓存音频字节，避免切页时重复读盘"""
+    try:
+        with open(path, "rb") as f:
+            return f.read()
+    except Exception:
+        return None
 
 
 def save_times(d):
@@ -186,7 +187,10 @@ def render_home():
     st.text("""这里是 Python 创赛营根据地，由各位优秀的同学们一起建设。
 你是否为了程序的报错而抓耳挠腮？或者是为找不到小黑子而烦恼呢？
 那这里，你都可以解决这些。""")
-    st.snow()
+
+    if "snowed" not in st.session_state:
+        st.snow()
+        st.session_state["snowed"] = True
 
     name = st.text_input("请输入你的名字：", value=st.session_state.get("user_name", ""))
     if name:
@@ -234,7 +238,10 @@ def render_download():
     st.info("下载打开后如果出错，请移动到其他文件夹并以管理员权限运行！！！")
     if os.path.exists("001.png"):
         st.image("001.png", caption="使用说明")
-    st.snow()
+
+    if "snowed_dl" not in st.session_state:
+        st.snow()
+        st.session_state["snowed_dl"] = True
 
 
 # ============================================================
@@ -261,12 +268,9 @@ def render_music():
             st.markdown(f"### {cat}")
             current_cat = cat
         st.write(f"**{title}**")
-        if os.path.exists(path):
-            try:
-                with open(path, "rb") as f:
-                    st.audio(f.read(), format="audio/mp3", start_time=0)
-            except Exception:
-                st.caption(f"⚠️ 无法播放 `{path}`")
+        audio_bytes = load_audio(path)
+        if audio_bytes:
+            st.audio(audio_bytes, format="audio/mp3", start_time=0)
         else:
             st.caption(f"⚠️ 缺少文件 `{path}`")
     st.write("---")
@@ -331,13 +335,16 @@ def render_dict():
     tab1, tab2, tab3 = st.tabs(["查询", "新增单词", "热词榜"])
 
     with tab1:
-        word = st.text_input("请输入要查询的单词", key="dict_query")
-        if word:
+        with st.form("dict_query_form"):
+            word = st.text_input("请输入要查询的单词")
+            submitted = st.form_submit_button("🔍 查询")
+        if submitted and word:
             if word in words_dict:
                 wid, meaning = words_dict[word]
                 st.success(f"**{word}** — {meaning}")
                 times_dict[wid] = times_dict.get(wid, 0) + 1
                 save_times(times_dict)
+                st.cache_data.clear()
                 st.caption(f"该词累计查询 {times_dict[wid]} 次")
                 if word.lower() == "python":
                     st.code("# 恭喜触发彩蛋：\nprint('hello world')", language="python")
@@ -502,9 +509,10 @@ def render_time():
     st.subheader("⏰ 当前时间")
     try:
         from streamlit_autorefresh import st_autorefresh
-        st_autorefresh(interval=1000, key="clock")
+        # 只在时间页渲染该组件时才定时刷新；离开页面后组件不再渲染，自然停止
+        st_autorefresh(interval=1000, limit=None, key="time_clock")
     except ImportError:
-        st.caption("未安装 streamlit-autorefresh，时间不会自动刷新")
+        st.caption("⚠️ 未安装 streamlit-autorefresh，时间不会自动刷新。请执行：pip install streamlit-autorefresh")
     st.markdown(f"### {time.strftime('%Y-%m-%d %H:%M:%S')}")
     st.caption(f"系统：{platform.system()} {platform.release()}")
 
@@ -541,7 +549,6 @@ def main():
 
     st.sidebar.title("🐍 创赛营根据地")
 
-    # 兼容低版本 Streamlit：没有 toggle 就用 checkbox
     if hasattr(st.sidebar, "toggle"):
         st.sidebar.toggle("🌙 暗黑模式", key="dark_mode")
     else:
@@ -554,7 +561,7 @@ def main():
     if st.session_state.get("dark_mode"):
         st.markdown(DARK_CSS, unsafe_allow_html=True)
 
-    if st.session_state.get("_visited") is None:
+    if "_visited" not in st.session_state:
         st.session_state["_visited"] = bump_visit()
 
     try:
