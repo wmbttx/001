@@ -1,29 +1,28 @@
 # -*- coding: utf-8 -*-
 """
-Python 创赛营根据地 - 轻量版
-依赖：streamlit pillow requests
+Python 创赛营根据地 - 轻量版（词典在线查询兜底）
+依赖：streamlit requests qqmusic-api-python
 运行：streamlit run app.py
 """
 
 import os
-import io
 import random
 import platform
 from datetime import datetime, timezone, timedelta
+from urllib.parse import quote
 
 import streamlit as st
 
 st.set_page_config(page_title="创赛营根据地", page_icon="🐍", layout="wide")
 
 import requests
-from PIL import Image, ImageChops
 
 # ========== 常量 ==========
 WORD_FILE = "words_space.txt"
 TIMES_FILE = "check_out_times.txt"
 REPLY_FILE = "reply.txt"
 VISIT_FILE = "visit_count.txt"
-VERSION = "7.0.0"
+VERSION = "7.3.0"
 
 ONE_LINERS = ["代码写得好，头发掉得早。", "报错不可怕，可怕的是不知道错在哪。",
               "今天你学 Python 了吗？", "Bug 是程序员的浪漫。", "创赛营根据地，欢迎回家。"]
@@ -111,47 +110,52 @@ def link(name, url):
     st.markdown(f"- [{name}]({url})")
 
 
-# ========== 音乐搜索（简化，失败给手动链接） ==========
+# ========== 音乐搜索 ==========
 def render_music():
     st.subheader("🎵 音乐搜索")
-    kw = st.text_input("🔍 歌曲名或歌手", placeholder="例如：周杰伦、晴天")
+    kw = st.text_input("🔍 歌曲名或歌手", placeholder="例如：See You Again")
     if not kw:
         st.info("输入关键词后按回车搜索。")
         return
 
     songs = None
-    try:
-        from qqmusic_api import Client
-        import asyncio
-
-        async def _s():
-            async with Client() as c:
-                return await c.search.search_by_type(keyword=kw, num=10)
-
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
+    variants = [kw, kw.replace(" ", ""), "+".join(kw.split())]
+    for variant in variants:
         try:
-            res = loop.run_until_complete(_s())
-        finally:
-            loop.close()
+            from qqmusic_api import Client
+            import asyncio
 
-        data = getattr(res, "body", res)
-        if isinstance(data, dict):
-            for k in ["req_1", "req_0", "data"]:
-                if k in data:
-                    data = data[k]
-            if "body" in data:
-                data = data["body"]
-            if "song" in data:
-                data = data["song"]
-            songs = data.get("list") if isinstance(data, dict) else None
-    except Exception:
-        songs = None
+            async def _s(keyword=variant):
+                async with Client() as c:
+                    return await c.search.search_by_type(keyword=keyword, num=10)
+
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            try:
+                res = loop.run_until_complete(_s())
+            finally:
+                loop.close()
+
+            data = getattr(res, "body", res)
+            if isinstance(data, dict):
+                for k in ["req_1", "req_0", "data"]:
+                    if k in data:
+                        data = data[k]
+                if "body" in data:
+                    data = data["body"]
+                if "song" in data:
+                    data = data["song"]
+                songs = data.get("list") if isinstance(data, dict) else None
+            if songs:
+                break
+        except Exception:
+            songs = None
 
     if not songs:
         st.warning("在线搜索暂不可用，可手动前往音乐平台搜索：")
-        st.markdown(f"- [QQ音乐「{kw}」](https://y.qq.com/n/ryqq/search?w={kw})")
-        st.markdown(f"- [网易云「{kw}」](https://music.163.com/#/search/m/?s={kw})")
+        enc = quote(kw)
+        st.markdown(f"- [QQ音乐「{kw}」](https://y.qq.com/n/ryqq/search?w={enc})")
+        st.markdown(f"- [网易云「{kw}」](https://music.163.com/#/search/m/?s={enc})")
         return
 
     for s in songs[:10]:
@@ -206,48 +210,6 @@ def render_download():
     st.markdown("- [海龟编辑器2 官网](https://www.codemao.cn/)")
 
 
-def render_image():
-    st.subheader("🌋 图片处理")
-    f = st.file_uploader("上传图片", type=["png", "jpg", "jpeg"])
-    if not f:
-        return
-    try:
-        img = Image.open(f).convert("RGB")
-    except Exception as e:
-        st.error(f"读取失败：{e}")
-        return
-
-    mode = st.selectbox("处理", ["原图", "通道重排", "灰度", "反色", "水平翻转", "旋转 90°"])
-    scale = st.slider("缩放 (%)", 10, 100, 100, 5)
-
-    try:
-        if mode == "原图":
-            out = img
-        elif mode == "通道重排":
-            r, g, b = img.split()
-            out = Image.merge("RGB", (g, b, r))
-        elif mode == "灰度":
-            out = img.convert("L").convert("RGB")
-        elif mode == "反色":
-            out = ImageChops.invert(img)
-        elif mode == "水平翻转":
-            out = img.transpose(Image.FLIP_LEFT_RIGHT)
-        else:
-            out = img.rotate(90, expand=True)
-        if scale < 100:
-            w, h = out.size
-            out = out.resize((max(1, int(w * scale / 100)), max(1, int(h * scale / 100))))
-
-        c1, c2 = st.columns(2)
-        c1.image(img, caption="原图", use_column_width=True)
-        c2.image(out, caption=f"{mode} / {scale}%", use_column_width=True)
-        buf = io.BytesIO()
-        out.save(buf, format="PNG")
-        st.download_button("💾 下载结果", buf.getvalue(), "processed.png", "image/png")
-    except Exception as e:
-        st.error(f"处理失败：{e}")
-
-
 def render_dict():
     st.subheader("📖 私人词典")
     words = load_words()
@@ -268,7 +230,10 @@ def render_dict():
                 if w.lower() == "python":
                     st.code("print('hello world')")
             else:
-                st.warning("未收录")
+                st.warning("本地词典未收录，可在线查询：")
+                enc = quote(w)
+                st.markdown(f"👉 [汉典「{w}」](https://www.zdic.net/hans/{enc})")
+                st.markdown(f"👉 [百度百科「{w}」](https://baike.baidu.com/item/{enc})")
 
     with t2:
         with st.form("a"):
@@ -341,7 +306,7 @@ def render_about():
 # ========== 路由 ==========
 PAGES = {
     "首页": render_home, "下载": render_download, "音乐": render_music,
-    "图片处理": render_image, "私人词典": render_dict, "调查": render_survey,
+    "私人词典": render_dict, "调查": render_survey,
     "导航": render_links, "时间": render_time, "关于": render_about,
 }
 
