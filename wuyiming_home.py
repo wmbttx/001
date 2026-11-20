@@ -32,7 +32,7 @@ def main():
     else:
         st.sidebar.checkbox("🌙 暗黑", key="dark")
     page = st.sidebar.radio("导航", PAGES)
-    st.sidebar.caption("v9.18.8.1.3.0")
+    st.sidebar.caption("v9.17.8.1.3.0")
 
     if st.session_state.get("dark"):
         st.markdown(DARK_CSS, unsafe_allow_html=True)
