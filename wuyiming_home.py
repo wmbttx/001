@@ -201,10 +201,6 @@ def render_home():
 你是否为了程序的报错而抓耳挠腮？或者是为找不到小黑子而烦恼呢？
 那这里，你都可以解决这些。""")
 
-    if "snowed" not in st.session_state:
-        st.snow()
-        st.session_state["snowed"] = True
-
     name = st.text_input("请输入你的名字：", value=st.session_state.get("user_name", ""))
     if name:
         st.session_state["user_name"] = name
@@ -251,10 +247,6 @@ def render_download():
     st.info("下载打开后如果出错，请移动到其他文件夹并以管理员权限运行！！！")
     if os.path.exists("001.png"):
         st.image("001.png", caption="使用说明")
-
-    if "snowed_dl" not in st.session_state:
-        st.snow()
-        st.session_state["snowed_dl"] = True
 
 
 # ============================================================
