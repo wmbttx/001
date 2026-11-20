@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-Python 创赛营根据地 - Streamlit 首页（防卡顿 + 自动刷新优化版）
+Python 创赛营根据地 - Streamlit 首页（北京时间修正版）
 运行：streamlit run app.py
 依赖：streamlit streamlit-autorefresh numpy pandas pillow requests
 """
@@ -10,6 +10,7 @@ import time
 import platform
 import random
 import io
+from datetime import datetime, timezone, timedelta
 
 import streamlit as st
 
@@ -36,7 +37,7 @@ MESSAGE_FILE = "leave_messages.txt"
 REPLY_FILE = "reply.txt"
 VISIT_FILE = "visit_count.txt"
 
-APP_VERSION = "5.4.0"
+APP_VERSION = "5.5.0"
 ROLES = {"阿短": "🌞", "编程猫": "🍥", "小黑子": "🐔", "路人甲": "👤"}
 
 ONE_LINERS = [
@@ -78,6 +79,18 @@ hr { border-color: #30363d !important; }
 button[data-baseweb="tab"] { color: #e6e6e6 !important; }
 </style>
 """
+
+
+# ============================================================
+# 时间工具：统一返回北京时间（UTC+8）
+# ============================================================
+def now_bj() -> datetime:
+    """返回北京时间，兼容无时区数据的精简镜像"""
+    try:
+        from zoneinfo import ZoneInfo
+        return datetime.now(ZoneInfo("Asia/Shanghai"))
+    except Exception:
+        return datetime.now(timezone.utc) + timedelta(hours=8)
 
 
 # ============================================================
@@ -179,7 +192,7 @@ def render_home():
     st.markdown("### :red[欢] :sunglasses: :blue[迎] :sunglasses: :green[~]")
 
     c1, c2, c3 = st.columns(3)
-    c1.metric("当前时间", time.strftime("%H:%M:%S"))
+    c1.metric("当前时间", now_bj().strftime("%H:%M:%S"))
     c2.metric("访客累计", st.session_state.get("_visited", 0))
     c3.metric("模式", "🌙 暗黑" if st.session_state.get("dark_mode") else "☀️ 亮色")
     st.info(f"💬 {random.choice(ONE_LINERS)}")
@@ -473,7 +486,7 @@ def render_survey():
     if sub:
         try:
             with open(REPLY_FILE, "a", encoding="utf-8") as f:
-                f.write(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}]\n"
+                f.write(f"[{now_bj().strftime('%Y-%m-%d %H:%M:%S')}]\n"
                         f"1. {q1}\n2. {q2}\n3. {q3}\n4. {q4}\n5. {q5}\n---\n")
             st.success("提交成功，感谢反馈！")
         except Exception as e:
@@ -506,15 +519,17 @@ def render_links():
 
 
 def render_time():
-    st.subheader("⏰ 当前时间")
+    st.subheader("⏰ 当前时间（北京时间 UTC+8）")
     try:
         from streamlit_autorefresh import st_autorefresh
-        # 只在时间页渲染该组件时才定时刷新；离开页面后组件不再渲染，自然停止
+        # 只在时间页渲染时定时刷新；离开页面后组件不再渲染，自动停止
         st_autorefresh(interval=1000, limit=None, key="time_clock")
     except ImportError:
         st.caption("⚠️ 未安装 streamlit-autorefresh，时间不会自动刷新。请执行：pip install streamlit-autorefresh")
-    st.markdown(f"### {time.strftime('%Y-%m-%d %H:%M:%S')}")
-    st.caption(f"系统：{platform.system()} {platform.release()}")
+
+    bj = now_bj()
+    st.markdown(f"### {bj.strftime('%Y-%m-%d %H:%M:%S')}")
+    st.caption(f"北京时间 (UTC+8) | 服务器：{platform.system()} {platform.release()}")
 
 
 def render_about():
@@ -547,7 +562,7 @@ def main():
     if "dark_mode" not in st.session_state:
         st.session_state["dark_mode"] = False
 
-    st.sidebar.title("🐍 创赛营根据地")
+    st.sidebar.title("🐍 mb的私人基地")
 
     if hasattr(st.sidebar, "toggle"):
         st.sidebar.toggle("🌙 暗黑模式", key="dark_mode")
