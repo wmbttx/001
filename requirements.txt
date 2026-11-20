@@ -1,6 +1,3 @@
 streamlit
-streamlit-autorefresh
-numpy
-pandas
 pillow
 requests
